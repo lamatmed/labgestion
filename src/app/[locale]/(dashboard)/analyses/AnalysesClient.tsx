@@ -15,11 +15,11 @@ import { Plus, Search, Edit2, Trash2, X, Loader2, FlaskConical } from 'lucide-re
 const AnalysisSchema = z.object({
   name: z.string().min(2),
   code: z.string().min(1),
-  price: z.coerce.number().positive(),
+  price: z.number().positive(),
   unit: z.string().optional(),
   category: z.string().optional(),
-  refRangeMin: z.coerce.number().optional().nullable(),
-  refRangeMax: z.coerce.number().optional().nullable(),
+  refRangeMin: z.number().nullable().optional(),
+  refRangeMax: z.number().nullable().optional(),
   refRangeText: z.string().optional(),
 })
 type AnalysisForm = z.infer<typeof AnalysisSchema>
@@ -265,7 +265,7 @@ export default function AnalysesClient({ analyses, locale: _locale }: Props) {
                   <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                     {t('price')} <span className="text-red-500">*</span>
                   </label>
-                  <input type="number" step="0.01" {...register('price')} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="number" step="0.01" {...register('price', { valueAsNumber: true })} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   {errors.price && <p className="mt-1 text-xs text-red-500">{errors.price.message}</p>}
                 </div>
                 <div>
@@ -284,11 +284,11 @@ export default function AnalysesClient({ analyses, locale: _locale }: Props) {
                 <div className="grid grid-cols-2 gap-4 mb-2">
                   <div>
                     <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">{t('refRangeMin')}</label>
-                    <input type="number" step="any" {...register('refRangeMin')} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input type="number" step="any" {...register('refRangeMin', { setValueAs: v => (v === '' || v === null || isNaN(Number(v)) ? null : Number(v)) })} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">{t('refRangeMax')}</label>
-                    <input type="number" step="any" {...register('refRangeMax')} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input type="number" step="any" {...register('refRangeMax', { setValueAs: v => (v === '' || v === null || isNaN(Number(v)) ? null : Number(v)) })} className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                 </div>
                 <div>
