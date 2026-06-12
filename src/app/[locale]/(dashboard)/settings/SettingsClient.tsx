@@ -140,11 +140,13 @@ export default function SettingsClient({ user, locale: _locale }: { user: UserDa
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-6">
         <h2 className="font-semibold text-gray-900 dark:text-white mb-4">{t('appearance')}</h2>
         <div className="grid grid-cols-3 gap-3">
-          {[
-            { value: 'light', label: t('themeLight'), icon: Sun },
-            { value: 'dark', label: t('themeDark'), icon: Moon },
-            { value: 'system', label: t('themeSystem'), icon: Monitor },
-          ].map(({ value, label, icon: Icon }) => (
+          {(
+            [
+              { value: 'light', label: t('themeLight'), icon: Sun },
+              { value: 'dark', label: t('themeDark'), icon: Moon },
+              { value: 'system', label: t('themeSystem'), icon: Monitor },
+            ] as const
+          ).map(({ value, label, icon: Icon }) => (
             <button key={value} type="button" onClick={() => setTheme(value)}
               className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${theme === value ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/30' : 'border-gray-200 dark:border-slate-600 hover:border-blue-300 dark:hover:border-slate-500'}`}>
               <Icon className={`w-5 h-5 ${theme === value ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`} />
