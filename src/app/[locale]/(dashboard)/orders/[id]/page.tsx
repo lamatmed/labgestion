@@ -17,7 +17,15 @@ export default async function OrderDetailPage({
     where: { id },
     include: {
       patient: true,
-      analyses: { include: { analysisType: true } },
+      analyses: {
+      include: {
+        analysisType: {
+          include: {
+            reagents: { include: { product: { select: { id: true, name: true, unit: true, quantity: true } } } },
+          },
+        },
+      },
+    },
       payments: { orderBy: { paidAt: 'desc' } },
     },
   })

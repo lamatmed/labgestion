@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { CheckCircle, XCircle, Plus, FileText, Loader2, Download } from 'lucide-react'
+import { CheckCircle, XCircle, Plus, FileText, Loader2, Download, Package, AlertTriangle } from 'lucide-react'
 import { addPayment, saveResults, completeOrder, cancelOrder } from '@/actions/orders'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { OrderStatusBadge } from '@/components/ui/Badge'
@@ -15,7 +15,13 @@ type OrderDetail = {
   patient: { id: string; firstName: string; lastName: string; phone: string; dateOfBirth: Date; gender: string };
   analyses: Array<{
     id: string; result: string | null; flag: string | null; unit: string | null; refRange: string | null; completedAt: Date | null;
-    analysisType: { name: string; code: string; price: number };
+    analysisType: {
+      name: string; code: string; price: number;
+      reagents: Array<{
+        productId: string; quantityPerTest: number;
+        product: { id: string; name: string; unit: string; quantity: number };
+      }>;
+    };
   }>;
   payments: Array<{ id: string; amount: number; method: string; paidAt: Date; notes: string | null }>;
 }
@@ -31,6 +37,22 @@ export default function OrderDetailClient({ order, locale }: { order: OrderDetai
   const tc = useTranslations('common')
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+
+  // Aggregate reagent consumption across all analyses in this order
+  const reagentConsumption = (() => {
+    const map = new Map<string, { product: { name: string; unit: string; quantity: number }; total: number }>()
+    for (const item of order.analyses) {
+      for (const r of item.analysisType.reagents) {
+        const existing = map.get(r.productId)
+        if (existing) {
+          existing.total += r.quantityPerTest
+        } else {
+          map.set(r.productId, { product: r.product, total: r.quantityPerTest })
+        }
+      }
+    }
+    return Array.from(map.values())
+  })()
   const [results, setResults] = useState<Record<string, { result: string; flag: '' | 'NORMAL' | 'HIGH' | 'LOW' }>>(
     Object.fromEntries(order.analyses.map((a) => [a.id, { result: a.result ?? '', flag: (a.flag ?? '') as any }]))
   )
@@ -55,8 +77,9 @@ export default function OrderDetailClient({ order, locale }: { order: OrderDetai
 
   function handleComplete() {
     startTransition(async () => {
-      await completeOrder(order.id)
-      router.refresh()
+      const res = await completeOrder(order.id)
+      if (!res.success) setError(res.error ?? tc('error'))
+      else router.refresh()
     })
   }
 
@@ -211,6 +234,39 @@ export default function OrderDetailClient({ order, locale }: { order: OrderDetai
                 {p.notes && <p className="text-xs text-gray-400 italic">{p.notes}</p>}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reagent consumption preview — shown only when order is not yet complete */}
+      {canEdit && reagentConsumption.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Package className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              Réactifs consommés à la validation
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {reagentConsumption.map((r) => {
+              const insufficient = r.product.quantity < r.total
+              return (
+                <div key={r.product.name} className="flex items-center justify-between text-sm">
+                  <span className="text-amber-900 dark:text-amber-200">{r.product.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-semibold ${insufficient ? 'text-red-600 dark:text-red-400' : 'text-amber-800 dark:text-amber-300'}`}>
+                      −{r.total} {r.product.unit}
+                    </span>
+                    <span className="text-amber-600 dark:text-amber-500 text-xs">
+                      (stock: {r.product.quantity})
+                    </span>
+                    {insufficient && (
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
