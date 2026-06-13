@@ -10,7 +10,7 @@ import type { AnalysisType } from '@prisma/client'
 import { createAnalysisType, updateAnalysisType, deleteAnalysisType } from '@/actions/analyses'
 import { Badge } from '@/components/ui/Badge'
 import { formatCurrency } from '@/lib/utils'
-import { Plus, Search, Edit2, Trash2, X, Loader2, FlaskConical, Package, PlusCircle } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, X, Loader2, FlaskConical, Package, PlusCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 
 const AnalysisSchema = z.object({
   name: z.string().min(2),
@@ -34,11 +34,15 @@ type AnalysisWithReagents = AnalysisType & {
     id: string
     productId: string
     quantityPerTest: number
-    product: { id: string; name: string; unit: string | null }
+    product: { id: string; name: string; unit: string | null; unitPrice: number }
   }>
 }
 
-type Product = { id: string; name: string; unit: string; quantity: number }
+type Product = { id: string; name: string; unit: string; quantity: number; unitPrice: number }
+
+function calcCost(reagents: AnalysisWithReagents['reagents']): number {
+  return reagents.reduce((sum, r) => sum + r.quantityPerTest * r.product.unitPrice, 0)
+}
 
 interface Props {
   analyses: AnalysisWithReagents[]
@@ -67,8 +71,11 @@ export default function AnalysesClient({ analyses, products, locale: _locale }: 
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<AnalysisForm>({ resolver: zodResolver(AnalysisSchema) })
+
+  const watchedPrice = watch('price') ?? 0
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -224,6 +231,7 @@ export default function AnalysesClient({ analyses, products, locale: _locale }: 
                 <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-slate-400">{tc('price')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-slate-400">{t('referenceRange')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-slate-400">{t('reagents')}</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-slate-400">Rentabilité</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-500 dark:text-slate-400">{tc('actions')}</th>
               </tr>
             </thead>
@@ -267,6 +275,38 @@ export default function AnalysesClient({ analyses, products, locale: _locale }: 
                       ) : (
                         <span className="text-gray-400 dark:text-slate-500 text-xs">—</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const cost = calcCost(analysis.reagents)
+                        const profit = analysis.price - cost
+                        if (analysis.reagents.length === 0) return <span className="text-gray-400 dark:text-slate-500 text-xs">—</span>
+                        const pct = cost > 0 ? Math.round((profit / analysis.price) * 100) : 100
+                        if (profit < 0) return (
+                          <div className="flex items-center gap-1">
+                            <TrendingDown className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                            <div>
+                              <div className="text-xs font-semibold text-red-600 dark:text-red-400">{profit < 0 ? '-' : '+'}{formatCurrency(Math.abs(profit))}</div>
+                              <div className="text-[10px] text-red-500">coût: {formatCurrency(cost)}</div>
+                            </div>
+                          </div>
+                        )
+                        if (profit === 0) return (
+                          <div className="flex items-center gap-1">
+                            <Minus className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                            <span className="text-xs text-gray-500">Seuil zéro</span>
+                          </div>
+                        )
+                        return (
+                          <div className="flex items-center gap-1">
+                            <TrendingUp className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                            <div>
+                              <div className="text-xs font-semibold text-green-600 dark:text-green-400">+{formatCurrency(profit)}</div>
+                              <div className="text-[10px] text-gray-500">marge {pct}%</div>
+                            </div>
+                          </div>
+                        )
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
@@ -372,6 +412,9 @@ export default function AnalysesClient({ analyses, products, locale: _locale }: 
                               <Package className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                               <span className="text-sm text-gray-900 dark:text-white truncate">{prod?.name ?? r.productId}</span>
                               <span className="text-xs text-amber-600 dark:text-amber-400 shrink-0">× {r.quantityPerTest} {prod?.unit}</span>
+                              {prod && prod.unitPrice > 0 && (
+                                <span className="text-xs text-gray-400 dark:text-slate-500">= {formatCurrency(r.quantityPerTest * prod.unitPrice)}</span>
+                              )}
                             </div>
                             <button type="button" onClick={() => removeReagent(r.productId)} className="shrink-0 text-gray-400 hover:text-red-500 transition-colors">
                               <X className="w-3.5 h-3.5" />
@@ -394,7 +437,7 @@ export default function AnalysesClient({ analyses, products, locale: _locale }: 
                         .filter((p) => !reagents.some((r) => r.productId === p.id))
                         .map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.name} ({p.unit}) — {p.quantity} en stock
+                            {p.name} ({p.unit}) — {formatCurrency(p.unitPrice)}/unité — stock: {p.quantity}
                           </option>
                         ))}
                     </select>
@@ -416,6 +459,24 @@ export default function AnalysesClient({ analyses, products, locale: _locale }: 
                       <PlusCircle className="w-4 h-4" />
                     </button>
                   </div>
+
+                  {/* Live profitability preview */}
+                  {reagents.length > 0 && (() => {
+                    const cost = reagents.reduce((s, r) => {
+                      const prod = products.find((p) => p.id === r.productId)
+                      return s + r.quantityPerTest * (prod?.unitPrice ?? 0)
+                    }, 0)
+                    const price = Number(watchedPrice) || 0
+                    const profit = price - cost
+                    const profitable = profit >= 0
+                    return (
+                      <div className={`mt-3 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border ${profitable ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800'}`}>
+                        {profitable ? <TrendingUp className="w-4 h-4 shrink-0" /> : <TrendingDown className="w-4 h-4 shrink-0" />}
+                        <span>Coût réactifs : <strong>{formatCurrency(cost)}</strong></span>
+                        <span className="ml-auto font-bold">{profit >= 0 ? '+' : ''}{formatCurrency(profit)}</span>
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
 

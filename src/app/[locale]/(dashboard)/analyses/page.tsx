@@ -12,12 +12,12 @@ export default async function AnalysesPage({
       orderBy: { createdAt: 'desc' },
       include: {
         reagents: {
-          include: { product: { select: { id: true, name: true, unit: true } } },
+          include: { product: { select: { id: true, name: true, unit: true, unitPrice: true } } },
         },
       },
     }),
     prisma.product.findMany({
-      select: { id: true, name: true, unit: true, quantity: true },
+      select: { id: true, name: true, unit: true, quantity: true, unitPrice: true },
       orderBy: { name: 'asc' },
     }),
   ])
