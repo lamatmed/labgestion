@@ -55,6 +55,7 @@ model User {
   email         String         @unique
   password      String
   role          Role           @default(TECHNICIAN)
+  permissions   String[]       @default([])
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   notifications Notification[]
@@ -75,18 +76,30 @@ model Patient {
 }
 
 model AnalysisType {
-  id           String          @id @default(cuid())
+  id           String                @id @default(cuid())
   name         String
-  code         String          @unique
+  code         String                @unique
   price        Float
   unit         String?
   refRangeMin  Float?
   refRangeMax  Float?
   refRangeText String?
   category     String?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
   orderItems   OrderAnalysis[]
+  reagents     AnalysisTypeReagent[]
+}
+
+model AnalysisTypeReagent {
+  id              String       @id @default(cuid())
+  analysisTypeId  String
+  analysisType    AnalysisType @relation(fields: [analysisTypeId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantityPerTest Float        @default(1)
+
+  @@unique([analysisTypeId, productId])
 }
 
 model AnalysisOrder {
@@ -129,17 +142,18 @@ model Supplier {
 }
 
 model Product {
-  id            String         @id @default(cuid())
-  name          String
-  reference     String?
-  category      String?
-  unit          String
-  quantity      Float          @default(0)
-  minQuantity   Float          @default(0)
-  unitPrice     Float
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  purchaseItems PurchaseItem[]
+  id               String                @id @default(cuid())
+  name             String
+  reference        String?
+  category         String?
+  unit             String
+  quantity         Float                 @default(0)
+  minQuantity      Float                 @default(0)
+  unitPrice        Float
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  purchaseItems    PurchaseItem[]
+  analysisReagents AnalysisTypeReagent[]
 }
 
 model Purchase {

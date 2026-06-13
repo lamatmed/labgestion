@@ -181,7 +181,10 @@
     "deleteTitle": "Supprimer l'analyse",
     "configured": "configuré(s)",
     "refRangeOr": "Ou texte libre (ex: Négatif, <5.0)",
-    "searchPlaceholder": "Rechercher une analyse..."
+    "searchPlaceholder": "Rechercher une analyse...",
+    "reagents": "Réactifs",
+    "reagentsHint": "(déduits du stock à la validation)",
+    "selectProduct": "Sélectionner un produit..."
   },
   "orders": {
     "title": "Ordonnances",
@@ -411,7 +414,10 @@
     "fullName": "Nom complet",
     "passwordOptional": "Laisser vide pour ne pas changer",
     "user": "Utilisateur",
-    "createdAt": "Créé le"
+    "createdAt": "Créé le",
+    "permissions": "Permissions",
+    "permissionsTitle": "Permissions d'accès",
+    "permissionsDesc": "Cochez les pages auxquelles ce technicien peut accéder."
   },
   "settings": {
     "title": "Paramètres",

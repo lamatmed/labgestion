@@ -29,12 +29,13 @@ const navItems = [
 interface SidebarProps {
   locale: string
   role: string
+  permissions: string[]
   mobileOpen: boolean
   desktopCollapsed: boolean
   onMobileClose: () => void
 }
 
-export function Sidebar({ locale, role, mobileOpen, desktopCollapsed, onMobileClose }: SidebarProps) {
+export function Sidebar({ locale, role, permissions, mobileOpen, desktopCollapsed, onMobileClose }: SidebarProps) {
   const t = useTranslations('nav')
   const pathname = usePathname()
   const base = `/${locale}`
@@ -104,6 +105,8 @@ export function Sidebar({ locale, role, mobileOpen, desktopCollapsed, onMobileCl
               )
             }
             if (item.key === 'users' && role !== 'ADMIN') return null
+            // TECHNICIAN with explicit permissions: hide pages they can't access
+            if (role !== 'ADMIN' && permissions.length > 0 && item.href && !permissions.includes(item.key)) return null
 
             const Icon = item.icon!
             const active = isActive(item.href)

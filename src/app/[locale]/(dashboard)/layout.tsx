@@ -1,7 +1,9 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { DashboardShell } from '@/components/layout/DashboardShell'
+import { hasPageAccess } from '@/lib/permissions'
 import type { Notification } from '@prisma/client'
 
 export default async function DashboardLayout({
@@ -16,6 +18,23 @@ export default async function DashboardLayout({
 
   if (!session?.user) {
     redirect(`/${locale}/login`)
+  }
+
+  // Fetch user with permissions for access control
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true, permissions: true },
+  })
+  const permissions = dbUser?.permissions ?? []
+
+  // Enforce page-level permissions via x-pathname set by middleware
+  const h = await headers()
+  const pathname = h.get('x-pathname') ?? ''
+  const segments = pathname.split('/').filter(Boolean) // ['fr', 'patients']
+  const pageSlug = segments[1] ?? ''
+
+  if (!hasPageAccess(dbUser?.role ?? session.user.role, permissions, pageSlug)) {
+    redirect(`/${locale}`)
   }
 
   // Auto-create LOW_STOCK notifications (max once per 12h per product)
@@ -70,6 +89,7 @@ export default async function DashboardLayout({
       }}
       locale={locale}
       notifications={notifications}
+      permissions={permissions}
     >
       {children}
     </DashboardShell>

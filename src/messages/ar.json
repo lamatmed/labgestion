@@ -181,7 +181,10 @@
     "deleteTitle": "حذف التحليل",
     "configured": "نوع/أنواع مُعدَّة",
     "refRangeOr": "أو نص حر (مثال: سالب، <5.0)",
-    "searchPlaceholder": "البحث عن تحليل..."
+    "searchPlaceholder": "البحث عن تحليل...",
+    "reagents": "الكواشف",
+    "reagentsHint": "(تُخصم من المخزون عند التحقق)",
+    "selectProduct": "اختر منتجاً..."
   },
   "orders": {
     "title": "الطلبات",
@@ -411,7 +414,10 @@
     "fullName": "الاسم الكامل",
     "passwordOptional": "اترك فارغاً لعدم التغيير",
     "user": "المستخدم",
-    "createdAt": "تاريخ الإنشاء"
+    "createdAt": "تاريخ الإنشاء",
+    "permissions": "الصلاحيات",
+    "permissionsTitle": "صلاحيات الوصول",
+    "permissionsDesc": "ضع علامة على الصفحات التي يمكن لهذا التقني الوصول إليها."
   },
   "settings": {
     "title": "الإعدادات",

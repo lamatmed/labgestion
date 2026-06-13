@@ -56,3 +56,13 @@ export async function deleteUser(id: string) {
     return { success: false, error: 'Erreur lors de la suppression' }
   }
 }
+
+export async function updateUserPermissions(userId: string, permissions: string[]) {
+  try {
+    await prisma.user.update({ where: { id: userId }, data: { permissions } })
+    revalidatePath('/', 'layout')
+    return { success: true }
+  } catch {
+    return { success: false, error: 'Erreur lors de la mise à jour des permissions' }
+  }
+}

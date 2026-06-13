@@ -4,6 +4,11 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
+const ReagentSchema = z.object({
+  productId: z.string().min(1),
+  quantityPerTest: z.number().positive(),
+})
+
 const AnalysisSchema = z.object({
   name: z.string().min(2),
   code: z.string().min(1).toUpperCase(),
@@ -13,12 +18,22 @@ const AnalysisSchema = z.object({
   refRangeMin: z.coerce.number().optional().nullable(),
   refRangeMax: z.coerce.number().optional().nullable(),
   refRangeText: z.string().optional(),
+  reagents: z.array(ReagentSchema).optional().default([]),
 })
 
 export async function createAnalysisType(data: z.infer<typeof AnalysisSchema>) {
   try {
-    const parsed = AnalysisSchema.parse(data)
-    await prisma.analysisType.create({ data: parsed })
+    const { reagents, ...parsed } = AnalysisSchema.parse(data)
+    await prisma.analysisType.create({
+      data: {
+        ...parsed,
+        ...(reagents.length > 0 && {
+          reagents: {
+            create: reagents.map((r) => ({ productId: r.productId, quantityPerTest: r.quantityPerTest })),
+          },
+        }),
+      },
+    })
     revalidatePath('/', 'layout')
     return { success: true }
   } catch (e: any) {
@@ -29,8 +44,20 @@ export async function createAnalysisType(data: z.infer<typeof AnalysisSchema>) {
 
 export async function updateAnalysisType(id: string, data: z.infer<typeof AnalysisSchema>) {
   try {
-    const parsed = AnalysisSchema.parse(data)
-    await prisma.analysisType.update({ where: { id }, data: parsed })
+    const { reagents, ...parsed } = AnalysisSchema.parse(data)
+    // Delete old reagents then recreate — simpler than upsert
+    await prisma.analysisTypeReagent.deleteMany({ where: { analysisTypeId: id } })
+    await prisma.analysisType.update({
+      where: { id },
+      data: {
+        ...parsed,
+        ...(reagents.length > 0 && {
+          reagents: {
+            create: reagents.map((r) => ({ productId: r.productId, quantityPerTest: r.quantityPerTest })),
+          },
+        }),
+      },
+    })
     revalidatePath('/', 'layout')
     return { success: true }
   } catch {

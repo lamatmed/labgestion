@@ -17,6 +17,11 @@ function isPublicPath(pathname: string): boolean {
 export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
+  // Build modified request headers with x-pathname so server components can read the
+  // current page slug for permission enforcement (via headers() in layout.tsx)
+  const requestHeaders = new Headers(req.headers)
+  requestHeaders.set('x-pathname', pathname)
+
   // Let intl handle public auth pages
   if (isPublicPath(pathname)) {
     return intlMiddleware(req)
@@ -34,7 +39,26 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL(`/${locale}/login`, req.url))
   }
 
-  return intlMiddleware(req)
+  // Run intl middleware to handle locale redirect if needed
+  const intlRes = intlMiddleware(req)
+
+  // If intl wants to redirect (e.g. / → /fr), honor that and skip header injection
+  if (intlRes && intlRes.status >= 300 && intlRes.status < 400) {
+    return intlRes
+  }
+
+  // For pass-through responses, return a new NextResponse.next with x-pathname injected
+  // so dashboard layout can read it via headers()
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
+
+  // Preserve any cookies that intl middleware may have set (e.g. NEXT_LOCALE)
+  if (intlRes) {
+    intlRes.cookies.getAll().forEach((cookie) => {
+      response.cookies.set(cookie.name, cookie.value)
+    })
+  }
+
+  return response
 }
 
 export const config = {

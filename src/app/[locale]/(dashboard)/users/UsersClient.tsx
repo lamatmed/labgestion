@@ -10,7 +10,20 @@ import type { User } from '@prisma/client'
 import { createUser, updateUser, deleteUser } from '@/actions/users'
 import { Badge } from '@/components/ui/Badge'
 import { formatDate, getInitials } from '@/lib/utils'
-import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, ShieldCheck, Eye, EyeOff } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, ShieldCheck, Eye, EyeOff, Key } from 'lucide-react'
+import { updateUserPermissions } from '@/actions/users'
+import { ALL_PAGES } from '@/lib/permissions'
+
+const PAGE_LABELS: Record<string, string> = {
+  patients: 'Patients',
+  analyses: "Types d'analyses",
+  orders: 'Ordonnances',
+  suppliers: 'Fournisseurs',
+  products: 'Produits',
+  purchases: 'Achats',
+  debts: 'Dettes',
+  finances: 'Finances',
+}
 
 const CreateUserSchema = z.object({
   name: z.string().min(2),
@@ -49,6 +62,9 @@ export default function UsersClient({ users, currentUserId, locale }: Props) {
   const [formSuccess, setFormSuccess] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [changePassword, setChangePassword] = useState(false)
+  const [permissionsTarget, setPermissionsTarget] = useState<User | null>(null)
+  const [localPerms, setLocalPerms] = useState<string[]>([])
+  const [savingPerms, setSavingPerms] = useState(false)
 
   const schema = editingUser ? EditUserSchema : CreateUserSchema
   const {
@@ -125,6 +141,24 @@ export default function UsersClient({ users, currentUserId, locale }: Props) {
       }
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  function openPermissions(u: User) {
+    setPermissionsTarget(u)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const existing = (u as any).permissions as string[] | undefined
+    setLocalPerms(existing && existing.length > 0 ? existing : [...ALL_PAGES])
+  }
+
+  async function handleSavePermissions() {
+    if (!permissionsTarget) return
+    setSavingPerms(true)
+    try {
+      const res = await updateUserPermissions(permissionsTarget.id, localPerms)
+      if (res.success) { router.refresh(); setPermissionsTarget(null) }
+    } finally {
+      setSavingPerms(false)
     }
   }
 
@@ -232,7 +266,18 @@ export default function UsersClient({ users, currentUserId, locale }: Props) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        {user.role === 'TECHNICIAN' && (
+                          <button
+                            type="button"
+                            onClick={() => openPermissions(user)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 dark:hover:text-blue-400 transition-colors"
+                            title={t('permissions')}
+                          >
+                            <Key className="w-4 h-4" />
+                          </button>
+                        )}
                         <button
+                          type="button"
                           onClick={() => openEdit(user)}
                           className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 dark:hover:text-amber-400 transition-colors"
                           title={tc('edit')}
@@ -240,6 +285,7 @@ export default function UsersClient({ users, currentUserId, locale }: Props) {
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => setDeleteTarget(user)}
                           disabled={user.id === currentUserId}
                           className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
@@ -435,6 +481,54 @@ export default function UsersClient({ users, currentUserId, locale }: Props) {
                 {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
                 {tc('delete')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permissions Modal (TECHNICIAN only) */}
+      {permissionsTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setPermissionsTarget(null)} />
+          <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm border border-gray-100 dark:border-slate-700">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-slate-700">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white">{t('permissionsTitle')}</h2>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{permissionsTarget.name}</p>
+              </div>
+              <button type="button" onClick={() => setPermissionsTarget(null)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5">
+              <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">{t('permissionsDesc')}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {ALL_PAGES.map((page) => {
+                  const checked = localPerms.includes(page)
+                  return (
+                    <label key={page} className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${checked ? 'border-blue-300 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-700' : 'border-gray-200 dark:border-slate-700 hover:border-blue-200'}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => setLocalPerms(e.target.checked ? [...localPerms, page] : localPerms.filter((p) => p !== page))}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className={`text-sm font-medium ${checked ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-slate-300'}`}>
+                        {PAGE_LABELS[page]}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+              <div className="flex justify-end gap-3 mt-5">
+                <button type="button" onClick={() => setPermissionsTarget(null)} className="px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-slate-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+                  {tc('cancel')}
+                </button>
+                <button type="button" onClick={handleSavePermissions} disabled={savingPerms} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors">
+                  {savingPerms && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {tc('save')}
+                </button>
+              </div>
             </div>
           </div>
         </div>

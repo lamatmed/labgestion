@@ -113,10 +113,51 @@ export async function saveResults(
 
 export async function completeOrder(orderId: string) {
   try {
-    await prisma.analysisOrder.update({
-      where: { id: orderId },
-      data: { status: 'COMPLETED', completedAt: new Date() },
+    // Fetch reagent requirements for all analyses in this order
+    const orderAnalyses = await prisma.orderAnalysis.findMany({
+      where: { orderId },
+      include: { analysisType: { include: { reagents: true } } },
     })
+
+    // Aggregate total consumption per product
+    const consumption = new Map<string, number>()
+    for (const item of orderAnalyses) {
+      for (const reagent of item.analysisType.reagents) {
+        consumption.set(reagent.productId, (consumption.get(reagent.productId) ?? 0) + reagent.quantityPerTest)
+      }
+    }
+
+    // Mark complete + deduct stock atomically
+    await prisma.$transaction([
+      prisma.analysisOrder.update({
+        where: { id: orderId },
+        data: { status: 'COMPLETED', completedAt: new Date() },
+      }),
+      ...Array.from(consumption.entries()).map(([productId, qty]) =>
+        prisma.product.update({ where: { id: productId }, data: { quantity: { decrement: qty } } })
+      ),
+    ])
+
+    // Alert for products that went low/out after deduction
+    if (consumption.size > 0) {
+      const affected = await prisma.product.findMany({
+        where: { id: { in: Array.from(consumption.keys()) } },
+        select: { id: true, name: true, quantity: true, minQuantity: true },
+      })
+      for (const p of affected) {
+        if (p.minQuantity > 0 && p.quantity <= p.minQuantity) {
+          try {
+            await createNotification({
+              type: 'LOW_STOCK',
+              title: p.quantity <= 0 ? `Rupture: ${p.name}` : `Stock faible: ${p.name}`,
+              message: `${p.name}: ${p.quantity} restant(s) / min ${p.minQuantity}`,
+              link: `/products#${p.id}`,
+            })
+          } catch { /* non-critical */ }
+        }
+      }
+    }
+
     await createNotification({
       type: 'ORDER_COMPLETED',
       title: 'Ordonnance terminée',

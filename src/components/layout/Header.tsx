@@ -85,7 +85,7 @@ export function Header({ user, locale, notifications, sidebarCollapsed, onMobile
 
         <ThemeToggle />
 
-        <NotificationDropdown notifications={notifications} userId={user.id} />
+        <NotificationDropdown notifications={notifications} userId={user.id} locale={currentLocale} />
 
         {/* User menu */}
         <div className="relative">

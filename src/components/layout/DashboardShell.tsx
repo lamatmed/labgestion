@@ -9,10 +9,11 @@ interface Props {
   user: { id: string; name: string; email: string; role: string }
   locale: string
   notifications: Notification[]
+  permissions: string[]
   children: React.ReactNode
 }
 
-export function DashboardShell({ user, locale, notifications, children }: Props) {
+export function DashboardShell({ user, locale, notifications, permissions, children }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [desktopCollapsed, setDesktopCollapsed] = useState(false)
 
@@ -21,6 +22,7 @@ export function DashboardShell({ user, locale, notifications, children }: Props)
       <Sidebar
         locale={locale}
         role={user.role}
+        permissions={permissions}
         mobileOpen={mobileOpen}
         desktopCollapsed={desktopCollapsed}
         onMobileClose={() => setMobileOpen(false)}

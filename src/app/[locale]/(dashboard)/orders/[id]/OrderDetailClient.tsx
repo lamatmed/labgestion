@@ -34,7 +34,7 @@ export default function OrderDetailClient({ order, locale }: { order: OrderDetai
   const [results, setResults] = useState<Record<string, { result: string; flag: '' | 'NORMAL' | 'HIGH' | 'LOW' }>>(
     Object.fromEntries(order.analyses.map((a) => [a.id, { result: a.result ?? '', flag: (a.flag ?? '') as any }]))
   )
-  const [payAmount, setPayAmount] = useState(0)
+  const [payAmount, setPayAmount] = useState<number | ''>('')
   const [payMethod, setPayMethod] = useState<'CASH' | 'CARD' | 'BANK_TRANSFER'>('CASH')
   const [payNotes, setPayNotes] = useState('')
   const [payModalOpen, setPayModalOpen] = useState(false)
@@ -69,9 +69,11 @@ export default function OrderDetailClient({ order, locale }: { order: OrderDetai
   }
 
   function handlePay() {
+    const amount = Number(payAmount)
+    if (!amount || amount <= 0) return
     startTransition(async () => {
-      const res = await addPayment(order.id, payAmount, payMethod, payNotes)
-      if (res.success) { setPayModalOpen(false); setPayAmount(0); router.refresh() }
+      const res = await addPayment(order.id, amount, payMethod, payNotes)
+      if (res.success) { setPayModalOpen(false); setPayAmount(''); router.refresh() }
       else setError(res.error ?? tc('error'))
     })
   }
@@ -237,8 +239,15 @@ export default function OrderDetailClient({ order, locale }: { order: OrderDetai
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                   {t('paymentAmount', { amount: formatCurrency(remaining) })}
                 </label>
-                <input type="number" min={1} max={remaining} value={payAmount} onChange={(e) => setPayAmount(Number(e.target.value))}
-                  className="w-full px-3.5 py-2 border border-gray-200 dark:border-slate-600 rounded-xl bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input
+                  type="number"
+                  min={1}
+                  max={remaining}
+                  value={payAmount}
+                  placeholder={String(remaining)}
+                  onChange={(e) => setPayAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full px-3.5 py-2 border border-gray-200 dark:border-slate-600 rounded-xl bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t('paymentMode')}</label>
@@ -257,7 +266,7 @@ export default function OrderDetailClient({ order, locale }: { order: OrderDetai
             </div>
             <div className="flex gap-3 mt-5">
               <button type="button" onClick={() => setPayModalOpen(false)} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700">{tc('cancel')}</button>
-              <button type="button" onClick={handlePay} disabled={isPending || payAmount <= 0}
+              <button type="button" onClick={handlePay} disabled={isPending || !payAmount || Number(payAmount) <= 0}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-sm font-medium">
                 {isPending && <Loader2 className="w-4 h-4 animate-spin" />} {tc('confirm')}
               </button>
