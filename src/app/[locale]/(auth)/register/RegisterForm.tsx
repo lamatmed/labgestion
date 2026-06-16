@@ -8,6 +8,39 @@ import { Eye, EyeOff, FlaskConical, Loader2, User, Mail, Lock, CheckCircle2 } fr
 import { registerUser } from '@/actions/register'
 import { usePathname } from 'next/navigation'
 
+function passwordScore(pw: string): { score: number; label: string; color: string } {
+  let score = 0
+  if (pw.length >= 8) score++
+  if (pw.length >= 12) score++
+  if (/[A-Z]/.test(pw)) score++
+  if (/[0-9]/.test(pw)) score++
+  if (/[^A-Za-z0-9]/.test(pw)) score++
+  if (score <= 1) return { score, label: 'Très faible', color: 'bg-red-500' }
+  if (score === 2) return { score, label: 'Faible', color: 'bg-orange-500' }
+  if (score === 3) return { score, label: 'Moyen', color: 'bg-yellow-500' }
+  if (score === 4) return { score, label: 'Fort', color: 'bg-blue-500' }
+  return { score, label: 'Très fort', color: 'bg-green-500' }
+}
+
+function PasswordStrength({ password }: { password: string }) {
+  const { score, label, color } = passwordScore(password)
+  if (password.length < 8) {
+    return <p className="text-xs text-amber-500 mt-1.5">Minimum 8 caractères requis</p>
+  }
+  return (
+    <div className="mt-1.5 space-y-1">
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= score ? color : 'bg-gray-200 dark:bg-slate-600'}`} />
+        ))}
+      </div>
+      <p className={`text-xs ${score <= 2 ? 'text-orange-500' : score === 3 ? 'text-yellow-600' : 'text-green-600 dark:text-green-400'}`}>
+        {label}
+      </p>
+    </div>
+  )
+}
+
 export default function RegisterForm({ locale }: { locale: string }) {
   const t = useTranslations('auth')
   const router = useRouter()
@@ -155,7 +188,7 @@ export default function RegisterForm({ locale }: { locale: string }) {
                   value={form.password}
                   onChange={update('password')}
                   required
-                  minLength={6}
+                  minLength={8}
                   autoComplete="new-password"
                   placeholder="••••••••"
                   className="w-full ps-10 pe-11 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -165,8 +198,8 @@ export default function RegisterForm({ locale }: { locale: string }) {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {form.password && form.password.length < 6 && (
-                <p className="text-xs text-amber-500 mt-1">{t('passwordHint')}</p>
+              {form.password && (
+                <PasswordStrength password={form.password} />
               )}
             </div>
 
@@ -212,7 +245,11 @@ export default function RegisterForm({ locale }: { locale: string }) {
 
             <button
               type="submit"
-              disabled={isPending || (!!form.confirmPassword && form.confirmPassword !== form.password)}
+              disabled={
+                isPending ||
+                form.password.length < 8 ||
+                (!!form.confirmPassword && form.confirmPassword !== form.password)
+              }
               className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-xl transition-colors shadow-sm shadow-blue-600/20"
             >
               {isPending && <Loader2 className="w-4 h-4 animate-spin" />}

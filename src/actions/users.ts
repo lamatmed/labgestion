@@ -6,6 +6,7 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { requireAdmin, requireAuth } from '@/lib/auth-guard'
 import { ALL_PAGES } from '@/lib/permissions'
+import { audit } from '@/lib/audit'
 
 const BCRYPT_ROUNDS = 12
 
@@ -17,17 +18,18 @@ const UserSchema = z.object({
 })
 
 export async function createUser(data: z.infer<typeof UserSchema>) {
-  const { error } = await requireAdmin()
-  if (error) return { success: false, error }
+  const { session, error } = await requireAdmin()
+  if (error || !session) return { success: false, error }
 
   try {
     const parsed = UserSchema.parse(data)
     if (!parsed.password) return { success: false, error: 'Mot de passe requis' }
 
     const hashed = await bcrypt.hash(parsed.password, BCRYPT_ROUNDS)
-    await prisma.user.create({
+    const created = await prisma.user.create({
       data: { name: parsed.name, email: parsed.email, password: hashed, role: parsed.role },
     })
+    audit('user.create', session!.user.id, created.id, { role: parsed.role })
     revalidatePath('/', 'layout')
     return { success: true }
   } catch (e: any) {
@@ -53,6 +55,7 @@ export async function updateUser(id: string, data: Omit<z.infer<typeof UserSchem
       updateData.password = await bcrypt.hash(data.password, BCRYPT_ROUNDS)
     }
     await prisma.user.update({ where: { id }, data: updateData })
+    audit('user.update', session.user.id, id)
     revalidatePath('/', 'layout')
     return { success: true }
   } catch {
@@ -67,6 +70,7 @@ export async function deleteUser(id: string) {
 
   try {
     await prisma.user.delete({ where: { id } })
+    audit('user.delete', session.user.id, id)
     revalidatePath('/', 'layout')
     return { success: true }
   } catch {
@@ -75,8 +79,8 @@ export async function deleteUser(id: string) {
 }
 
 export async function updateUserPermissions(userId: string, permissions: string[]) {
-  const { error } = await requireAdmin()
-  if (error) return { success: false, error }
+  const { session, error } = await requireAdmin()
+  if (error || !session) return { success: false, error }
 
   // Validate: only known page slugs are accepted
   const validSlugs = ALL_PAGES as readonly string[]
@@ -84,6 +88,7 @@ export async function updateUserPermissions(userId: string, permissions: string[
 
   try {
     await prisma.user.update({ where: { id: userId }, data: { permissions: sanitized } })
+    audit('user.permissions_change', session.user.id, userId, { granted: sanitized })
     revalidatePath('/', 'layout')
     return { success: true }
   } catch {

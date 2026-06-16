@@ -32,6 +32,7 @@ export default function LoginForm({ locale }: { locale: string }) {
       email,
       password,
       redirect: false,
+      ip: '', // IP is injected server-side; empty string is safe fallback
     })
 
     if (res?.error) {
