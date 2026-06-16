@@ -5,9 +5,9 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 
 const RegisterSchema = z.object({
-  name: z.string().min(2, 'Le nom doit contenir au moins 2 caractères'),
-  email: z.string().email('Email invalide'),
-  password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
+  name: z.string().min(2, 'Le nom doit contenir au moins 2 caractères').max(100),
+  email: z.string().email('Email invalide').max(254),
+  password: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères').max(128),
 })
 
 export async function registerUser(data: {
@@ -22,7 +22,7 @@ export async function registerUser(data: {
 
   try {
     const parsed = RegisterSchema.parse(data)
-    const hashed = await bcrypt.hash(parsed.password, 10)
+    const hashed = await bcrypt.hash(parsed.password, 12)
 
     await prisma.user.create({
       data: {

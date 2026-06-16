@@ -27,9 +27,23 @@ export default async function proxy(req: NextRequest) {
     return intlMiddleware(req)
   }
 
-  // Skip static files and API routes
-  if (pathname.startsWith('/api') || pathname.includes('.')) {
+  // Skip static files — API routes (only /api/auth/*) still go through auth check
+  if (pathname.includes('.')) {
     return NextResponse.next()
+  }
+
+  // Allow only the NextAuth API routes without custom auth logic
+  if (pathname.startsWith('/api/auth')) {
+    return NextResponse.next()
+  }
+
+  // All other /api/* routes require authentication
+  if (pathname.startsWith('/api')) {
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+    return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
   const session = await auth()

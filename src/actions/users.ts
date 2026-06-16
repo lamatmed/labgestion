@@ -4,6 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
+import { requireAdmin, requireAuth } from '@/lib/auth-guard'
+import { ALL_PAGES } from '@/lib/permissions'
+
+const BCRYPT_ROUNDS = 12
 
 const UserSchema = z.object({
   name: z.string().min(2),
@@ -13,11 +17,14 @@ const UserSchema = z.object({
 })
 
 export async function createUser(data: z.infer<typeof UserSchema>) {
+  const { error } = await requireAdmin()
+  if (error) return { success: false, error }
+
   try {
     const parsed = UserSchema.parse(data)
     if (!parsed.password) return { success: false, error: 'Mot de passe requis' }
 
-    const hashed = await bcrypt.hash(parsed.password, 10)
+    const hashed = await bcrypt.hash(parsed.password, BCRYPT_ROUNDS)
     await prisma.user.create({
       data: { name: parsed.name, email: parsed.email, password: hashed, role: parsed.role },
     })
@@ -30,14 +37,20 @@ export async function createUser(data: z.infer<typeof UserSchema>) {
 }
 
 export async function updateUser(id: string, data: Omit<z.infer<typeof UserSchema>, 'password'> & { password?: string }) {
+  const { session, error } = await requireAuth()
+  if (error || !session) return { success: false, error }
+
+  // A technician can only update their own profile (not role changes)
+  const isAdmin = session.user.role === 'ADMIN'
+  const isSelf = session.user.id === id
+  if (!isAdmin && !isSelf) return { success: false, error: 'Accès refusé' }
+
   try {
-    const updateData: Record<string, unknown> = {
-      name: data.name,
-      email: data.email,
-      role: data.role,
-    }
+    const updateData: Record<string, unknown> = { name: data.name, email: data.email }
+    // Only admins can change roles
+    if (isAdmin) updateData.role = data.role
     if (data.password) {
-      updateData.password = await bcrypt.hash(data.password, 10)
+      updateData.password = await bcrypt.hash(data.password, BCRYPT_ROUNDS)
     }
     await prisma.user.update({ where: { id }, data: updateData })
     revalidatePath('/', 'layout')
@@ -48,6 +61,10 @@ export async function updateUser(id: string, data: Omit<z.infer<typeof UserSchem
 }
 
 export async function deleteUser(id: string) {
+  const { session, error } = await requireAdmin()
+  if (error || !session) return { success: false, error }
+  if (session.user.id === id) return { success: false, error: 'Vous ne pouvez pas supprimer votre propre compte' }
+
   try {
     await prisma.user.delete({ where: { id } })
     revalidatePath('/', 'layout')
@@ -58,8 +75,15 @@ export async function deleteUser(id: string) {
 }
 
 export async function updateUserPermissions(userId: string, permissions: string[]) {
+  const { error } = await requireAdmin()
+  if (error) return { success: false, error }
+
+  // Validate: only known page slugs are accepted
+  const validSlugs = ALL_PAGES as readonly string[]
+  const sanitized = permissions.filter((p) => validSlugs.includes(p))
+
   try {
-    await prisma.user.update({ where: { id: userId }, data: { permissions } })
+    await prisma.user.update({ where: { id: userId }, data: { permissions: sanitized } })
     revalidatePath('/', 'layout')
     return { success: true }
   } catch {
